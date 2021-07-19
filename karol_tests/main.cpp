@@ -28,7 +28,7 @@ unsigned char generateRandomByte()
  * bufferSize has to be big enough to store the user id and the operation label
  * size of user id is 4 for 32-bit system
  */
-size_t generateRandomBuffer(
+void generateRandomBuffer(
     size_t userId,
     string operationLabel,
     OlmBuffer &buffer,
@@ -36,7 +36,7 @@ size_t generateRandomBuffer(
 {
   if (bufferSize < sizeof(size_t) + operationLabel.size())
   {
-    return -1;
+    return;
   }
   buffer.resize(bufferSize);
   size_t i = 0;
@@ -52,7 +52,6 @@ size_t generateRandomBuffer(
   {
     buffer[i] = generateRandomByte();
   }
-  return 0;
 }
 
 // TODO This is a problem, I don't know what is this message here
@@ -102,19 +101,16 @@ struct Session
     {
       throw runtime_error("error createOutbound => session already created");
     }
-    this->sessionBuffer.resize(::olm_session_size());
-    this->session = ::olm_session(this->sessionBuffer.data());
-    OlmBuffer randomBuffer(::olm_create_outbound_session_random_length(this->session));
+    this->sessionBuffer.resize(olm_session_size());
+    this->session = olm_session(this->sessionBuffer.data());
+    OlmBuffer randomBuffer(olm_create_outbound_session_random_length(this->session));
 
-    if (-1 == generateRandomBuffer(
+    generateRandomBuffer(
                   this->userId,
                   "create outbound",
                   randomBuffer,
-                  olm_create_account_random_length(this->ownerUserAccount)))
-    {
-      throw runtime_error("error createOutbound => generateRandomBuffer");
-    }
-    if (-1 == ::olm_create_outbound_session(
+                  randomBuffer.size());
+    if (-1 == olm_create_outbound_session(
                   this->session,
                   this->ownerUserAccount,
                   idKeys.data() + 15, // B's curve25519 identity key
@@ -139,9 +135,9 @@ struct Session
       throw runtime_error("error createOutbound => session already created");
     }
     OlmBuffer tmpEncryptedMessage(encryptedMessage);
-    this->sessionBuffer.resize(::olm_account_size());
-    this->session = ::olm_session(this->sessionBuffer.data());
-    if (-1 == ::olm_create_inbound_session(
+    this->sessionBuffer.resize(olm_account_size());
+    this->session = olm_session(this->sessionBuffer.data());
+    if (-1 == olm_create_inbound_session(
                   this->session,
                   this->ownerUserAccount,
                   tmpEncryptedMessage.data(),
@@ -150,8 +146,8 @@ struct Session
       throw runtime_error("error createInbound => olm_create_inbound_session");
     }
     // Check that the inbound session matches the message it was created from.
-    std::memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-    if (1 != ::olm_matches_inbound_session(
+    memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
+    if (1 != olm_matches_inbound_session(
                  this->session,
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
@@ -161,8 +157,8 @@ struct Session
 
     // Check that the inbound session matches the key this message is supposed
     // to be from.
-    std::memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-    if (1 != ::olm_matches_inbound_session_from(
+    memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
+    if (1 != olm_matches_inbound_session_from(
                  this->session,
                  idKeys.data() + 15, // A's curve125519 identity key
                  43,
@@ -173,8 +169,8 @@ struct Session
     }
 
     // Check that the inbound session isn't from a different user.
-    std::memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-    if (0 != ::olm_matches_inbound_session_from(
+    memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
+    if (0 != olm_matches_inbound_session_from(
                  this->session,
                  ownerIdentityKeys + 15, // B's curve25519 identity key.
                  43,
@@ -188,9 +184,9 @@ struct Session
 
   OlmBuffer storeAsB64(string secretKey)
   {
-    size_t pickleLength = ::olm_pickle_session_length(this->session);
+    size_t pickleLength = olm_pickle_session_length(this->session);
     OlmBuffer pickle(pickleLength);
-    size_t res = ::olm_pickle_session(
+    size_t res = olm_pickle_session(
         this->session,
         secretKey.data(),
         secretKey.size(),
@@ -248,14 +244,11 @@ struct User
     OlmBuffer random;
     this->accountBuffer.resize(olm_account_size());
     this->account = olm_account(this->accountBuffer.data());
-    if (-1 == generateRandomBuffer(
+    generateRandomBuffer(
                   this->userId,
                   "create account",
                   random,
-                  olm_create_account_random_length(this->account)))
-    {
-      throw runtime_error("error createAccount => generateRandomBuffer");
-    }
+                  olm_create_account_random_length(this->account));
 
     if (-1 == olm_create_account(
                   this->account,
@@ -293,16 +286,13 @@ struct User
   void generateOneTimeKeys(size_t oneTimeKeysAmount)
   {
     OlmBuffer random;
-    if (-1 == generateRandomBuffer(
+    generateRandomBuffer(
                   this->userId,
                   "one time keys",
                   random,
                   olm_account_generate_one_time_keys_random_length(
                       this->account,
-                      oneTimeKeysAmount)))
-    {
-      throw runtime_error("error generateOneTimeKeys => generateRandomBuffer");
-    }
+                      oneTimeKeysAmount));
 
     if (-1 == olm_account_generate_one_time_keys(
                   this->account,
@@ -375,6 +365,59 @@ struct User
     this->generatePreKeyBundle();
     this->initializeSession();
   }
+
+  // encryptedMessage, messageType
+  tuple<OlmBuffer, size_t> encrypt(string encrypted)
+  {
+    OlmBuffer encryptedMessage(
+        olm_encrypt_message_length(this->session->session, encrypted.size()));
+    OlmBuffer messageRandom;
+    messageRandom.resize(olm_encrypt_random_length(this->session->session));
+    generateRandomBuffer(
+                  this->userId,
+                  "encrypt",
+                  messageRandom,
+                  messageRandom.size());
+    size_t messageType = olm_encrypt_message_type(this->session->session);
+    if (-1 == olm_encrypt(
+                  this->session->session,
+                  (uint8_t *)encrypted.data(),
+                  encrypted.size(),
+                  messageRandom.data(),
+                  messageRandom.size(),
+                  encryptedMessage.data(),
+                  encryptedMessage.size()))
+    {
+      throw runtime_error("error encrypt => olm_encrypt");
+    }
+    return {encryptedMessage, messageType};
+  }
+
+  string decrypt(tuple<std::vector<std::uint8_t>, size_t> encryptedData, size_t originalSize)
+  {
+    std::vector<std::uint8_t> encryptedMessage = get<0>(encryptedData);
+    size_t messageType = get<1>(encryptedData);
+
+    std::vector<std::uint8_t> tmpEncryptedMessage(encryptedMessage);
+    size_t size = ::olm_decrypt_max_plaintext_length(
+        this->session->session, messageType, tmpEncryptedMessage.data(), tmpEncryptedMessage.size());
+    std::vector<std::uint8_t> decryptedMessage(size);
+    size_t res = ::olm_decrypt(
+        this->session->session,
+        messageType,
+        encryptedMessage.data(),
+        encryptedMessage.size(),
+        decryptedMessage.data(),
+        decryptedMessage.size());
+    if (std::size_t(originalSize) != res)
+    {
+      throw runtime_error("error olm_decrypt " + to_string(res));
+    }
+    decryptedMessage.resize(originalSize);
+    string result = (char *)decryptedMessage.data();
+    result.resize(originalSize);
+    return result;
+  }
 };
 
 int main()
@@ -393,21 +436,37 @@ int main()
 
   userA->session->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
 
-  OlmBuffer box(userA->session->sessionBuffer);
+  string message = "this is a message 345";
 
-  OlmBuffer pickledSession = userA->session->storeAsB64(pickleKey);
-  userA->session->restoreFromB64(pickleKey, pickledSession);
+  tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(message);
+  cout << "encrypted: " << get<0>(encryptedData).data() << endl;
 
-  cout << "TEST PASSED? ";
-  if (memcmp(box.data(), userA->session->sessionBuffer.data(), box.size()) == 0)
-  {
-    cout << "YES";
-  }
-  else
-  {
-    cout << "NO";
-  }
-  cout << endl;
+  userB->session->createInbound(get<0>(encryptedData), userA->preKeyBundle.identityKeys);
+
+  string decrypted = userB->decrypt(encryptedData, message.size());
+  cout << "decrypted: " << decrypted << endl;
+
+  // now: enc/dec works
+  // next: try to mix it with pickling 
+
+  // userA->session->storeAsB64
+
+
+  // OlmBuffer box(userA->session->sessionBuffer);
+
+  // OlmBuffer pickledSession = userA->session->storeAsB64(pickleKey);
+  // userA->session->restoreFromB64(pickleKey, pickledSession);
+
+  // cout << "TEST PASSED? ";
+  // if (memcmp(box.data(), userA->session->sessionBuffer.data(), box.size()) == 0)
+  // {
+  //   cout << "YES";
+  // }
+  // else
+  // {
+  //   cout << "NO";
+  // }
+  // cout << endl;
 
   cout << "GOODBYE" << endl;
 
