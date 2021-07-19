@@ -55,12 +55,13 @@ size_t generateRandomBuffer(
   return 0;
 }
 
+// TODO This is a problem, I don't know what is this message here
+const string preKeySignatureMessage = "what is this message? :/";
+
 struct PreKeyBundle
 {
-  OlmBuffer identityKeys;    // size = 116
-  OlmBuffer signedPreKey;    // size = 43
-  OlmBuffer preKeySignature; // size = 86
-  OlmBuffer oneTimeKeys;     // size = 43 each
+  OlmBuffer identityKeys; // size = 116
+  OlmBuffer oneTimeKeys;  // size = 43 each
 };
 
 struct User
@@ -69,7 +70,7 @@ struct User
 
   ::OlmAccount *account;
   OlmBuffer accountBuffer;
-  
+
   PreKeyBundle preKeyBundle;
 
   User(size_t userId) : userId(userId) {}
@@ -151,51 +152,9 @@ struct User
     return olm_account_mark_keys_as_published(this->account);
   }
 
-  void generateSignedPreKey()
-  {
-    OlmBuffer signingBuffer(olm_pk_signing_size());
-    OlmPkSigning *signing = olm_pk_signing(signingBuffer.data());
-
-    this->preKeyBundle.signedPreKey.resize(olm_pk_signing_public_key_length() + 1);
-
-    OlmBuffer seed;
-
-    generateRandomBuffer(
-        userId,
-        "generate signed prekey",
-        seed,
-        olm_pk_signing_seed_length());
-    olm_pk_signing_key_from_seed(
-        signing,
-        this->preKeyBundle.signedPreKey.data(),
-        this->preKeyBundle.signedPreKey.size(),
-        seed.data(),
-        seed.size());
-  }
-
-  void generatePreKeySignature()
-  {
-    // TODO This is a problem, I don't know what is this message here
-    string message = "what is this message? :/";
-    this->preKeyBundle.preKeySignature.resize(
-        olm_account_signature_length(this->account));
-
-    if (-1 == olm_account_sign(
-                  this->account,
-                  message.data(),
-                  message.size(),
-                  this->preKeyBundle.preKeySignature.data(),
-                  this->preKeyBundle.preKeySignature.size()))
-    {
-      throw runtime_error("error generatePreKeySignature => olm_account_sign");
-    }
-  }
-
   void generatePreKeyBundle(size_t oneTimeKeysAmount)
   {
     this->getPublicIdentityKeys();
-    this->generateSignedPreKey();
-    this->generatePreKeySignature();
     this->generateOneTimeKeys(oneTimeKeysAmount);
     size_t publishedOneTimeKeys = this->publishOneTimeKeys();
     if (publishedOneTimeKeys != oneTimeKeysAmount)
@@ -213,16 +172,6 @@ int main()
   unique_ptr<User> userA(new User(2785));
   userA->createAccount();
   userA->generatePreKeyBundle(50);
-
-  cout << "pre key bundle generated" << endl;
-  cout << " => identity keys(" << userA->preKeyBundle.identityKeys.size() << ")" << endl
-       << userA->preKeyBundle.identityKeys.data() << endl;
-  cout << " => signed pre key(" << userA->preKeyBundle.signedPreKey.size()<< ")" << endl
-       << userA->preKeyBundle.signedPreKey.data() << endl;
-  cout << " => pre key signature(" << userA->preKeyBundle.preKeySignature.size() << ")" << endl
-       << userA->preKeyBundle.preKeySignature.data() << endl;
-  cout << " => one-time keys(" << userA->preKeyBundle.oneTimeKeys.size() << ")" << endl
-       << userA->preKeyBundle.oneTimeKeys.data() << endl;
 
   cout << "GOODBYE" << endl;
 
