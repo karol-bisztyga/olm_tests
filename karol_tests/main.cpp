@@ -162,6 +162,41 @@ struct User
       throw runtime_error("error generatePreKeyBundle => invalid amount of one-time keys published. Expected " + to_string(oneTimeKeysAmount) + ", got " + to_string(publishedOneTimeKeys));
     }
   }
+
+  OlmBuffer storeAsB64(string secretKey)
+  {
+    std::size_t pickleLength = ::olm_pickle_account_length(this->account);
+    OlmBuffer pickleBuffer(pickleLength);
+    if (pickleLength != ::olm_pickle_account(
+                            this->account,
+                            secretKey.data(),
+                            secretKey.size(),
+                            pickleBuffer.data(),
+                            pickleLength))
+    {
+      throw runtime_error("error storeAsB64 => olm_pickle_account");
+    }
+    return pickleBuffer;
+  }
+
+  void restoreFromB64(string secretKey, OlmBuffer &b64)
+  {
+    this->accountBuffer.resize(::olm_account_size());
+    this->account = ::olm_account(this->accountBuffer.data());
+    if (-1 == ::olm_unpickle_account(
+                  this->account,
+                  secretKey.data(),
+                  secretKey.size(),
+                  b64.data(),
+                  b64.size()))
+    {
+      throw runtime_error("error restoreFromB64 => olm_unpickle_account");
+    }
+    if (b64.size() != ::olm_pickle_account_length(this->account))
+    {
+      throw runtime_error("error restoreFromB64 => olm_pickle_account_length");
+    }
+  }
 };
 
 int main()
@@ -172,6 +207,32 @@ int main()
   unique_ptr<User> userA(new User(2785));
   userA->createAccount();
   userA->generatePreKeyBundle(50);
+
+  // we have to store this encrypted
+  string pickleKey = "secret48570";
+
+  // we have to store this and we can keep it as is
+  // I'm not sure if we want to know how big this will be
+  // if so, we should analyse `pickle_length` in account.cpp
+  OlmBuffer pickled = userA->storeAsB64(pickleKey);
+
+  unique_ptr<User> userB(new User(userA->userId));
+  userB->restoreFromB64(pickleKey, pickled);
+  userB->generatePreKeyBundle(50);
+
+  cout << "TEST PASSED? ";
+  if (memcmp(
+          userA->preKeyBundle.identityKeys.data(),
+          userB->preKeyBundle.identityKeys.data(),
+          userA->preKeyBundle.identityKeys.size()) == 0)
+  {
+    cout << "YES";
+  }
+  else
+  {
+    cout << "NO";
+  }
+  cout << endl;
 
   cout << "GOODBYE" << endl;
 
