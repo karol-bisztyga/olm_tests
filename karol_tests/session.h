@@ -8,13 +8,6 @@
 
 using namespace std;
 
-enum class SessionType
-{
-  UNDEFINED = 0,
-  INBOUND = 1,
-  OUTBOUND = 2,
-};
-
 struct Session
 {
   // should be passed from the owner User
@@ -25,7 +18,6 @@ struct Session
   //
   OlmSession *session;
   OlmBuffer sessionBuffer;
-  SessionType type = SessionType::UNDEFINED;
 
   Session(
       size_t userId,
@@ -42,7 +34,7 @@ struct Session
       OlmBuffer oneTimeKeys,
       size_t keyIndex)
   {
-    if (this->type != SessionType::UNDEFINED)
+    if (this->session != nullptr)
     {
       throw runtime_error("error createOutbound => session already created");
     }
@@ -67,7 +59,6 @@ struct Session
     {
       throw runtime_error("error createOutbound => olm_create_outbound_session");
     }
-    this->type = SessionType::OUTBOUND;
   }
 
   /**
@@ -75,10 +66,10 @@ struct Session
    */
   void createInbound(OlmBuffer encryptedMessage, OlmBuffer idKeys)
   {
-    // if (this->type != SessionType::UNDEFINED)
-    // {
-    //   throw runtime_error("error createOutbound => session already created");
-    // }
+    if (this->session != nullptr)
+    {
+      throw runtime_error("error createOutbound => session already created");
+    }
     OlmBuffer tmpEncryptedMessage(encryptedMessage);
     this->sessionBuffer.resize(olm_account_size());
     this->session = olm_session(this->sessionBuffer.data());
@@ -124,7 +115,6 @@ struct Session
     {
       throw runtime_error("error createInbound => olm_matches_inbound_session_from");
     }
-    this->type = SessionType::INBOUND;
   }
 
   OlmBuffer storeAsB64(string secretKey)

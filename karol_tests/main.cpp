@@ -20,8 +20,8 @@ int main()
 
   size_t idA = 2785;
   size_t idB = 2787;
-  string pickleKeyA = "pickleA";
-  string pickleKeyB = "pickleB";
+  string pickleKeyA = "CFm9YKyRapXBXGxrew64";
+  string pickleKeyB = "s3hwR4MsAKj6C3CYItdG";
 
   unique_ptr<User> userA(new User(idA));
   userA->initialize();
@@ -29,49 +29,49 @@ int main()
   unique_ptr<User> userB(new User(idB));
   userB->initialize();
 
-  for (size_t i = 0; i < 5; ++i) {
-    if (i > 0)
+  for (size_t i = 0; i < 10; ++i)
+  {
+    if (userA->session->session != nullptr && userB->session->session != nullptr)
     {
-      cout << "trying pickling A" << endl;
+      // pickle and unpickle A
       OlmBuffer pickledA = userA->storeAsB64(pickleKeyA);
       OlmBuffer pickledSessionA = userA->session->storeAsB64(pickleKeyA);
-      cout << "pickled" << endl;
 
       userA.reset(new User(idA));
       userA->restoreFromB64(pickleKeyA, pickledA);
       userA->session->restoreFromB64(pickleKeyA, pickledSessionA);
-      cout << "unpickled" << endl;
-      //
 
-      cout << "trying pickling B" << endl;
+      // pickle and unpickle B
       OlmBuffer pickledB = userB->storeAsB64(pickleKeyB);
       OlmBuffer pickledSessionB = userB->session->storeAsB64(pickleKeyB);
-      cout << "pickled" << endl;
 
       userB.reset(new User(idB));
       userB->restoreFromB64(pickleKeyB, pickledB);
       userB->session->restoreFromB64(pickleKeyB, pickledSessionB);
-      cout << "unpickled" << endl;
+
+      // cout << "pickle sizes: " << pickledA.size() << "/" << pickledSessionA.size() << " | " << pickledB.size() << "/" << pickledSessionB.size() << endl;
     }
     if (userA->session->session == nullptr)
     {
       userA->session->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
     }
 
-    string message = generateRandomMessage(50);
+    string message = generateRandomMessage();
 
     tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(message);
     cout << "encrypting: " << message << endl;
 
-    if (userB->session->session == nullptr) {
+    if (userB->session->session == nullptr)
+    {
       userB->session->createInbound(get<0>(encryptedData), userA->preKeyBundle.identityKeys);
     }
 
     string decrypted = userB->decrypt(encryptedData, message.size());
     cout << "decrypted:  " << decrypted << endl;
 
-    if (memcmp(message.data(), decrypted.data(), message.size()) != 0) {
-      throw new runtime_error("decrypted message doesn't match the original one: ["+ message +"] != ["+ decrypted +"]");
+    if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
+    {
+      throw new runtime_error("decrypted message doesn't match the original one: [" + message + "] != [" + decrypted + "]");
     }
   }
   cout << "TEST PASSED!" << endl;
