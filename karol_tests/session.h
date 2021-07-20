@@ -11,7 +11,7 @@ using namespace std;
 struct Session
 {
   // should be passed from the owner User
-  size_t userId;
+  string userId;
   OlmAccount *ownerUserAccount;
   std::uint8_t *ownerIdentityKeys;
 
@@ -20,7 +20,7 @@ struct Session
   OlmBuffer sessionBuffer;
 
   Session(
-      size_t userId,
+      string userId,
       OlmAccount *account,
       std::uint8_t *ownerIdentityKeys) : userId(userId),
                                          ownerUserAccount(account),
@@ -119,6 +119,7 @@ struct Session
 
   OlmBuffer storeAsB64(string secretKey)
   {
+    // min = 224, max = 4384
     size_t pickleLength = olm_pickle_session_length(this->session);
     OlmBuffer pickle(pickleLength);
     size_t res = olm_pickle_session(

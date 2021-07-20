@@ -18,8 +18,8 @@ int main()
   cout << "HELLO" << endl;
   srand((unsigned)time(0));
 
-  size_t idA = 2785;
-  size_t idB = 2787;
+  string idA = "2785";
+  string idB = "2787";
   string pickleKeyA = "CFm9YKyRapXBXGxrew64";
   string pickleKeyB = "s3hwR4MsAKj6C3CYItdG";
 

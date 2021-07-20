@@ -17,7 +17,7 @@ struct PreKeyBundle
 
 struct User
 {
-  const size_t userId;
+  const string userId;
 
   OlmAccount *account;
   OlmBuffer accountBuffer;
@@ -26,7 +26,7 @@ struct User
 
   unique_ptr<Session> session;
 
-  User(size_t userId) : userId(userId) {}
+  User(string userId) : userId(userId) {}
 
   void initialize()
   {
@@ -127,6 +127,7 @@ struct User
 
   OlmBuffer storeAsB64(string secretKey)
   {
+    // min 438, max 9504
     size_t pickleLength = olm_pickle_account_length(this->account);
     OlmBuffer pickleBuffer(pickleLength);
     if (pickleLength != olm_pickle_account(

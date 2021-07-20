@@ -65,7 +65,7 @@ unsigned char generateRandomByte()
  * size of user id is 4 for 32-bit system
  */
 void generateRandomBuffer(
-    size_t userId,
+    string userId,
     string operationLabel,
     OlmBuffer &buffer,
     size_t bufferSize)
@@ -75,10 +75,11 @@ void generateRandomBuffer(
     return;
   }
   buffer.resize(bufferSize);
+  size_t userIdAsNumber = (size_t)atoi(userId.c_str());
   size_t i = 0;
   for (i = 0; i < sizeof(size_t); ++i)
   {
-    buffer[i] = (userId >> i * 8) & 0xff;
+    buffer[i] = (userIdAsNumber >> i * 8) & 0xff;
   }
   for (char c : operationLabel)
   {
