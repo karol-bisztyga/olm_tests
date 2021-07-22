@@ -1,11 +1,15 @@
 #pragma once
 
 #include "olm/olm.h"
+#include "olm/session.hh"
 
 #include <vector>
+#include <unordered_map>
+#include <utility>
 
 #include "tools.h"
 #include "session.h"
+#include "persist.h"
 
 using namespace std;
 
@@ -19,48 +23,52 @@ struct User
 {
   const string userId;
 
-  OlmAccount *account;
+  OlmAccount *account = nullptr;
   OlmBuffer accountBuffer;
 
   PreKeyBundle preKeyBundle;
 
-  unique_ptr<Session> session;
+  MockRandom mockRandom;
 
-  User(string userId) : userId(userId) {}
+  unordered_map<string, unique_ptr<Session>> sessions = {};
+
+  User(string userId) : userId(userId), mockRandom(atoi(userId.c_str())) {}
 
   void initialize()
   {
     this->createAccount();
     this->generatePreKeyBundle();
-    this->initializeSession();
   }
 
   void createAccount()
   {
-    OlmBuffer random;
     this->accountBuffer.resize(olm_account_size());
     this->account = olm_account(this->accountBuffer.data());
-    generateRandomBuffer(
-        this->userId,
-        "create account",
-        random,
-        olm_create_account_random_length(this->account));
+    OlmBuffer randomAccountBuffer;
+    randomAccountBuffer.resize(olm_create_account_random_length(this->account));
+    this->mockRandom(randomAccountBuffer.data(), randomAccountBuffer.size());
 
     if (-1 == olm_create_account(
                   this->account,
-                  random.data(),
-                  random.size()))
+                  randomAccountBuffer.data(),
+                  randomAccountBuffer.size()))
     {
       throw runtime_error("error createAccount => olm_create_account");
     };
   }
 
-  void initializeSession()
+  void initializeSession(string targetUserId)
   {
-    this->session.reset(new Session(
-        this->userId,
-        this->account,
-        this->preKeyBundle.identityKeys.data()));
+    if (this->sessions.find(targetUserId) != this->sessions.end())
+    {
+      throw runtime_error("error initializeSession => session already initialized");
+    }
+    unique_ptr<Session> newSession(new Session(
+      this->userId,
+      this->account,
+      this->preKeyBundle.identityKeys.data(),
+      &this->mockRandom));
+    this->sessions.insert(make_pair(targetUserId, move(newSession)));
   }
 
   void getPublicIdentityKeys()
@@ -82,13 +90,8 @@ struct User
   void generateOneTimeKeys(size_t oneTimeKeysAmount)
   {
     OlmBuffer random;
-    generateRandomBuffer(
-        this->userId,
-        "one time keys",
-        random,
-        olm_account_generate_one_time_keys_random_length(
-            this->account,
-            oneTimeKeysAmount));
+    random.resize(olm_account_generate_one_time_keys_random_length(this->account, oneTimeKeysAmount));
+    mockRandom(random.data(), random.size());
 
     if (-1 == olm_account_generate_one_time_keys(
                   this->account,
@@ -125,59 +128,87 @@ struct User
     }
   }
 
-  OlmBuffer storeAsB64(string secretKey)
+  bool hasSessionFor(string targetUserId)
   {
-    // min 438, max 9504
-    size_t pickleLength = olm_pickle_account_length(this->account);
-    OlmBuffer pickleBuffer(pickleLength);
-    if (pickleLength != olm_pickle_account(
-                            this->account,
-                            secretKey.data(),
-                            secretKey.size(),
-                            pickleBuffer.data(),
-                            pickleLength))
+    return (this->sessions.find(targetUserId) != this->sessions.end());
+  }
+
+  Persist storeAsB64(string secretKey)
+  {
+    Persist persist;
+    // account
+    size_t accountPickleLength = olm_pickle_account_length(this->account); // min 438, max 9504
+    OlmBuffer accountPickleBuffer(accountPickleLength);
+    if (accountPickleLength != olm_pickle_account(
+                                   this->account,
+                                   secretKey.data(),
+                                   secretKey.size(),
+                                   accountPickleBuffer.data(),
+                                   accountPickleLength))
     {
       throw runtime_error("error storeAsB64 => olm_pickle_account");
     }
-    return pickleBuffer;
+    persist.account = accountPickleBuffer;
+    // sessions
+    unordered_map<string, unique_ptr<Session>>::iterator it;
+    for (it = this->sessions.begin(); it != this->sessions.end(); ++it)
+    {
+      OlmBuffer buffer = it->second->storeAsB64(secretKey);
+      persist.sessions.insert(make_pair(it->first, buffer));
+    }
+    //
+    return persist;
   }
 
-  void restoreFromB64(string secretKey, OlmBuffer &b64)
+  void restoreFromB64(string secretKey, Persist persist)
   {
+    // account
     this->accountBuffer.resize(olm_account_size());
     this->account = olm_account(this->accountBuffer.data());
     if (-1 == olm_unpickle_account(
                   this->account,
                   secretKey.data(),
                   secretKey.size(),
-                  b64.data(),
-                  b64.size()))
+                  persist.account.data(),
+                  persist.account.size()))
     {
       throw runtime_error("error restoreFromB64 => olm_unpickle_account");
     }
-    if (b64.size() != olm_pickle_account_length(this->account))
+    if (persist.account.size() != olm_pickle_account_length(this->account))
     {
       throw runtime_error("error restoreFromB64 => olm_pickle_account_length");
     }
     this->generatePreKeyBundle();
-    this->initializeSession();
+    // sessions
+    unordered_map<string, OlmBuffer>::iterator it;
+    for (it = persist.sessions.begin(); it != persist.sessions.end(); ++it)
+    {
+      unique_ptr<Session> session(new Session(
+          this->userId,
+          this->account,
+          this->preKeyBundle.identityKeys.data(),
+          &this->mockRandom));
+      session->restoreFromB64(secretKey, it->second);
+      this->sessions.insert(make_pair(it->first, move(session)));
+    }
   }
 
   // encryptedMessage, messageType
-  tuple<OlmBuffer, size_t> encrypt(string encrypted)
+  tuple<OlmBuffer, size_t> encrypt(string targetUserId, string encrypted)
   {
+    if (this->sessions.find(targetUserId) == this->sessions.end())
+    {
+      this->initializeSession(targetUserId);
+    }
+    OlmSession *session = this->sessions.at(targetUserId)->session;
     OlmBuffer encryptedMessage(
-        olm_encrypt_message_length(this->session->session, encrypted.size()));
+        olm_encrypt_message_length(session, encrypted.size()));
     OlmBuffer messageRandom;
-    messageRandom.resize(olm_encrypt_random_length(this->session->session));
-    generateRandomBuffer(
-        this->userId,
-        "encrypt",
-        messageRandom,
-        messageRandom.size());
-    size_t messageType = olm_encrypt_message_type(this->session->session);
+    messageRandom.resize(olm_encrypt_random_length(session));
+    mockRandom(messageRandom.data(), messageRandom.size());
+    size_t messageType = olm_encrypt_message_type(session);
     if (-1 == olm_encrypt(
-                  this->session->session,
+                  session,
                   (uint8_t *)encrypted.data(),
                   encrypted.size(),
                   messageRandom.data(),
@@ -190,17 +221,22 @@ struct User
     return {encryptedMessage, messageType};
   }
 
-  string decrypt(tuple<std::vector<std::uint8_t>, size_t> encryptedData, size_t originalSize)
+  string decrypt(string targetUserId, tuple<std::vector<std::uint8_t>, size_t> encryptedData, size_t originalSize)
   {
+    if (this->sessions.find(targetUserId) == this->sessions.end())
+    {
+      this->initializeSession(targetUserId);
+    }
+    OlmSession *session = this->sessions.at(targetUserId)->session;
     std::vector<std::uint8_t> encryptedMessage = get<0>(encryptedData);
     size_t messageType = get<1>(encryptedData);
 
     std::vector<std::uint8_t> tmpEncryptedMessage(encryptedMessage);
     size_t size = ::olm_decrypt_max_plaintext_length(
-        this->session->session, messageType, tmpEncryptedMessage.data(), tmpEncryptedMessage.size());
+        session, messageType, tmpEncryptedMessage.data(), tmpEncryptedMessage.size());
     std::vector<std::uint8_t> decryptedMessage(size);
     size_t res = ::olm_decrypt(
-        this->session->session,
+        session,
         messageType,
         encryptedMessage.data(),
         encryptedMessage.size(),
@@ -208,7 +244,7 @@ struct User
         decryptedMessage.size());
     if (std::size_t(originalSize) != res)
     {
-      throw runtime_error("error olm_decrypt " + to_string(res));
+      throw runtime_error("error olm_decrypt " + string(olm_session_last_error(session)));
     }
     decryptedMessage.resize(originalSize);
     string result = (char *)decryptedMessage.data();

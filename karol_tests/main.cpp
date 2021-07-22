@@ -7,21 +7,48 @@
 #include <tuple>
 #include <memory>
 #include <cstdlib>
+#include <map>
 
 #include "tools.h"
 #include "user.h"
+#include "persist.h"
 
 using namespace std;
 
-int main()
-{
-  cout << "HELLO" << endl;
-  srand((unsigned)time(0));
 
-  string idA = "2785";
-  string idB = "2787";
+void messageTest(User *userA, User *userB){
+  if (!userA->hasSessionFor(userB->userId))
+  {
+    userA->initializeSession(userB->userId);
+    userA->sessions.at(userB->userId)->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
+  }
+  string message = generateRandomMessage();
+  tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(userB->userId, message);
+  cout << "encrypting: " << message << endl;
+
+  if (!userB->hasSessionFor(userA->userId))
+  {
+    userB->initializeSession(userA->userId);
+    userB->sessions.at(userA->userId)->createInbound(get<0>(encryptedData), userA->preKeyBundle.identityKeys);
+  }
+
+  string decrypted = userB->decrypt(userA->userId, encryptedData, message.size());
+  cout << "decrypted:  " << decrypted << endl;
+
+  if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
+  {
+    throw new runtime_error("decrypted message doesn't match the original one: [" + message + "] != [" + decrypted + "]");
+  }
+}
+
+void doTest()
+{
+  string idA = "1000";
+  string idB = "2000";
+  string idC = "3000";
   string pickleKeyA = "CFm9YKyRapXBXGxrew64";
   string pickleKeyB = "s3hwR4MsAKj6C3CYItdG";
+  string pickleKeyC = "6KmB65eF6HZ2NPXi31vj";
 
   unique_ptr<User> userA(new User(idA));
   userA->initialize();
@@ -29,52 +56,45 @@ int main()
   unique_ptr<User> userB(new User(idB));
   userB->initialize();
 
-  for (size_t i = 0; i < 10; ++i)
+  cout << "initialized" << endl;
+  for (size_t i=0; i< 10; ++i)
   {
-    if (userA->session->session != nullptr && userB->session->session != nullptr)
+    // // pickle and unpickle A
+    if (true)
     {
-      // pickle and unpickle A
-      OlmBuffer pickledA = userA->storeAsB64(pickleKeyA);
-      OlmBuffer pickledSessionA = userA->session->storeAsB64(pickleKeyA);
-
+      Persist pickledA = userA->storeAsB64(pickleKeyA);
       userA.reset(new User(idA));
       userA->restoreFromB64(pickleKeyA, pickledA);
-      userA->session->restoreFromB64(pickleKeyA, pickledSessionA);
 
-      // pickle and unpickle B
-      OlmBuffer pickledB = userB->storeAsB64(pickleKeyB);
-      OlmBuffer pickledSessionB = userB->session->storeAsB64(pickleKeyB);
-
+      // // pickle and unpickle B
+      Persist pickledB = userB->storeAsB64(pickleKeyB);
       userB.reset(new User(idB));
       userB->restoreFromB64(pickleKeyB, pickledB);
-      userB->session->restoreFromB64(pickleKeyB, pickledSessionB);
-
-      // cout << "pickle sizes: " << pickledA.size() << "/" << pickledSessionA.size() << " | " << pickledB.size() << "/" << pickledSessionB.size() << endl;
     }
-    if (userA->session->session == nullptr)
+
+    int rnd = rand() % 2;
+    if (rnd)
     {
-      userA->session->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
+      messageTest(&(*userA), &(*userB));
     }
-
-    string message = generateRandomMessage();
-
-    tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(message);
-    cout << "encrypting: " << message << endl;
-
-    if (userB->session->session == nullptr)
+    else
     {
-      userB->session->createInbound(get<0>(encryptedData), userA->preKeyBundle.identityKeys);
+      messageTest(&(*userB), &(*userA));
     }
-
-    string decrypted = userB->decrypt(encryptedData, message.size());
-    cout << "decrypted:  " << decrypted << endl;
-
-    if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
-    {
-      throw new runtime_error("decrypted message doesn't match the original one: [" + message + "] != [" + decrypted + "]");
-    }
+    
   }
   cout << "TEST PASSED!" << endl;
+}
+
+int main()
+{
+  cout << "HELLO" << endl;
+  srand((unsigned)time(0));
+
+  while(true)
+  {
+    doTest();
+  }
 
   cout << "GOODBYE" << endl;
 

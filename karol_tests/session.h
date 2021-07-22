@@ -14,17 +14,20 @@ struct Session
   string userId;
   OlmAccount *ownerUserAccount;
   std::uint8_t *ownerIdentityKeys;
+  MockRandom *mockRandom;
 
   //
-  OlmSession *session;
+  OlmSession *session = nullptr;
   OlmBuffer sessionBuffer;
 
   Session(
       string userId,
       OlmAccount *account,
-      std::uint8_t *ownerIdentityKeys) : userId(userId),
-                                         ownerUserAccount(account),
-                                         ownerIdentityKeys(ownerIdentityKeys) {}
+      std::uint8_t *ownerIdentityKeys,
+      MockRandom *mockRandom) : userId(userId),
+                                ownerUserAccount(account),
+                                ownerIdentityKeys(ownerIdentityKeys),
+                                mockRandom(mockRandom) {}
 
   /**
    * this should be used when we are sending a message
@@ -36,17 +39,14 @@ struct Session
   {
     if (this->session != nullptr)
     {
-      throw runtime_error("error createOutbound => session already created");
+      throw new runtime_error("error createOutbound => session already initialized");
     }
     this->sessionBuffer.resize(olm_session_size());
     this->session = olm_session(this->sessionBuffer.data());
     OlmBuffer randomBuffer(olm_create_outbound_session_random_length(this->session));
 
-    generateRandomBuffer(
-        this->userId,
-        "create outbound",
-        randomBuffer,
-        randomBuffer.size());
+    (*this->mockRandom)(randomBuffer.data(), randomBuffer.size());
+
     if (-1 == olm_create_outbound_session(
                   this->session,
                   this->ownerUserAccount,
@@ -68,10 +68,10 @@ struct Session
   {
     if (this->session != nullptr)
     {
-      throw runtime_error("error createOutbound => session already created");
+      throw new runtime_error("error createInbound => session already initialized");
     }
     OlmBuffer tmpEncryptedMessage(encryptedMessage);
-    this->sessionBuffer.resize(olm_account_size());
+    this->sessionBuffer.resize(olm_session_size());
     this->session = olm_session(this->sessionBuffer.data());
     if (-1 == olm_create_inbound_session(
                   this->session,

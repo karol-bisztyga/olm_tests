@@ -9,6 +9,32 @@ using namespace std;
 
 typedef std::vector<std::uint8_t> OlmBuffer;
 
+struct MockRandom
+{
+  MockRandom(std::uint8_t offset = 0)
+      : tag(0x01), current(offset) {}
+  void operator()(
+      std::uint8_t *bytes, std::size_t length)
+  {
+    while (length > 32)
+    {
+      bytes[0] = tag;
+      std::memset(bytes + 1, current, 31);
+      length -= 32;
+      bytes += 32;
+      current += 1;
+    }
+    if (length)
+    {
+      bytes[0] = tag;
+      std::memset(bytes + 1, current, length - 1);
+      current += 1;
+    }
+  }
+  std::uint8_t tag;
+  std::uint8_t current;
+};
+
 vector<size_t> availableSigns;
 
 void initializeAvailableSigns()
@@ -55,38 +81,3 @@ unsigned char generateRandomByte()
   return (unsigned char)rand() % 256;
 }
 
-/**
- * fills given buffer with random data
- * receives user id and the operation label to ensure the uniqueness
- * across the system. That means the random buffer cannot be the same for 
- *  the same user and two different operations
- *  two different users for the same operation
- * bufferSize has to be big enough to store the user id and the operation label
- * size of user id is 4 for 32-bit system
- */
-void generateRandomBuffer(
-    string userId,
-    string operationLabel,
-    OlmBuffer &buffer,
-    size_t bufferSize)
-{
-  if (bufferSize < sizeof(size_t) + operationLabel.size())
-  {
-    return;
-  }
-  buffer.resize(bufferSize);
-  size_t userIdAsNumber = (size_t)atoi(userId.c_str());
-  size_t i = 0;
-  for (i = 0; i < sizeof(size_t); ++i)
-  {
-    buffer[i] = (userIdAsNumber >> i * 8) & 0xff;
-  }
-  for (char c : operationLabel)
-  {
-    buffer[++i] = c;
-  }
-  while (i++ < bufferSize)
-  {
-    buffer[i] = generateRandomByte();
-  }
-}
