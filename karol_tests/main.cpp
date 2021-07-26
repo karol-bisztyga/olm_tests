@@ -83,9 +83,16 @@ int main()
   std::cout << "HELLO" << std::endl;
   srand((unsigned)time(0));
 
-  while (messageIndex < 600)
+  try
   {
-    doTest();
+    while (messageIndex < 600)
+    {
+      doTest();
+    }
+  }
+  catch (std::runtime_error &err)
+  {
+    std::cout << "TEST FAILED with an error: " << err.what() << std::endl;
   }
 
   std::cout << "GOODBYE" << std::endl;
