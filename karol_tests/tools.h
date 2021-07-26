@@ -69,9 +69,10 @@ string generateRandomString(size_t size)
   return result;
 }
 
+static size_t messageIndex = 0;
+
 string generateRandomMessage(size_t forcedSize = 0)
 {
-  static size_t messageIndex = 0;
   size_t size = (forcedSize == 0) ? rand() % 30 + 40 : forcedSize;
   return "[message " + to_string(messageIndex++) + "] " + generateRandomString(size);
 }

@@ -136,6 +136,8 @@ struct User
   Persist storeAsB64(string secretKey)
   {
     Persist persist;
+    // mock random
+    persist.mockRandomCurrent = this->mockRandom.current;
     // account
     size_t accountPickleLength = olm_pickle_account_length(this->account); // min 438, max 9504
     OlmBuffer accountPickleBuffer(accountPickleLength);
@@ -162,6 +164,8 @@ struct User
 
   void restoreFromB64(string secretKey, Persist persist)
   {
+    // mock random
+    this->mockRandom.current = persist.mockRandomCurrent;
     // account
     this->accountBuffer.resize(olm_account_size());
     this->account = olm_account(this->accountBuffer.data());

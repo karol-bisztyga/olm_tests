@@ -7,7 +7,6 @@
 #include <tuple>
 #include <memory>
 #include <cstdlib>
-#include <map>
 
 #include "tools.h"
 #include "user.h"
@@ -15,8 +14,8 @@
 
 using namespace std;
 
-
-void messageTest(User *userA, User *userB){
+void messageTest(User *userA, User *userB)
+{
   if (!userA->hasSessionFor(userB->userId))
   {
     userA->initializeSession(userB->userId);
@@ -56,32 +55,55 @@ void doTest()
   unique_ptr<User> userB(new User(idB));
   userB->initialize();
 
+  unique_ptr<User> userC(new User(idC));
+  userC->initialize();
+
   cout << "initialized" << endl;
-  for (size_t i=0; i< 10; ++i)
+  for (size_t i = 0; i < 10; ++i)
   {
-    // // pickle and unpickle A
     if (true)
     {
+      // pickle and unpickle A
       Persist pickledA = userA->storeAsB64(pickleKeyA);
       userA.reset(new User(idA));
       userA->restoreFromB64(pickleKeyA, pickledA);
 
-      // // pickle and unpickle B
+      // pickle and unpickle B
       Persist pickledB = userB->storeAsB64(pickleKeyB);
       userB.reset(new User(idB));
       userB->restoreFromB64(pickleKeyB, pickledB);
+
+      // pickle and unpickle C
+      Persist pickledC = userC->storeAsB64(pickleKeyC);
+      userC.reset(new User(idC));
+      userC->restoreFromB64(pickleKeyC, pickledC);
     }
 
-    int rnd = rand() % 2;
-    if (rnd)
+    int rnd = rand() % 6;
+    if (rnd == 0)
     {
       messageTest(&(*userA), &(*userB));
     }
-    else
+    else if (rnd == 1)
+    {
+      messageTest(&(*userA), &(*userC));
+    }
+    else if (rnd == 2)
     {
       messageTest(&(*userB), &(*userA));
     }
-    
+    else if (rnd == 3)
+    {
+      messageTest(&(*userB), &(*userC));
+    }
+    else if (rnd == 4)
+    {
+      messageTest(&(*userC), &(*userA));
+    }
+    else
+    {
+      messageTest(&(*userC), &(*userB));
+    }
   }
   cout << "TEST PASSED!" << endl;
 }
@@ -91,7 +113,7 @@ int main()
   cout << "HELLO" << endl;
   srand((unsigned)time(0));
 
-  while(true)
+  while (messageIndex < 300)
   {
     doTest();
   }

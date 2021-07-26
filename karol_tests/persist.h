@@ -9,6 +9,7 @@ using namespace std;
 
 struct Persist
 {
+  uint8_t mockRandomCurrent;
   // min 438, max 9504
   OlmBuffer account;
   // min = 224, max = 4384
