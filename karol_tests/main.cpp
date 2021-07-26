@@ -16,6 +16,7 @@ using namespace std;
 
 void messageTest(User *userA, User *userB)
 {
+  cout << "test message: " << userA->userId << " => " << userB->userId << endl;
   if (!userA->hasSessionFor(userB->userId))
   {
     userA->initializeSession(userB->userId);
@@ -42,68 +43,39 @@ void messageTest(User *userA, User *userB)
 
 void doTest()
 {
-  string idA = "1000";
-  string idB = "2000";
-  string idC = "3000";
-  string pickleKeyA = "CFm9YKyRapXBXGxrew64";
-  string pickleKeyB = "s3hwR4MsAKj6C3CYItdG";
-  string pickleKeyC = "6KmB65eF6HZ2NPXi31vj";
-
-  unique_ptr<User> userA(new User(idA));
-  userA->initialize();
-
-  unique_ptr<User> userB(new User(idB));
-  userB->initialize();
-
-  unique_ptr<User> userC(new User(idC));
-  userC->initialize();
-
-  cout << "initialized" << endl;
+  vector<unique_ptr<User>> users;
   for (size_t i = 0; i < 10; ++i)
   {
-    if (true)
-    {
-      // pickle and unpickle A
-      Persist pickledA = userA->storeAsB64(pickleKeyA);
-      userA.reset(new User(idA));
-      userA->restoreFromB64(pickleKeyA, pickledA);
+    unique_ptr<User> user(new User(to_string(1000 + i)));
+    user->initialize();
+    users.push_back(move(user));
+  }
+  cout << "initialized" << endl;
 
-      // pickle and unpickle B
-      Persist pickledB = userB->storeAsB64(pickleKeyB);
-      userB.reset(new User(idB));
-      userB->restoreFromB64(pickleKeyB, pickledB);
+  for (size_t i = 0; i < 100; ++i)
+  {
+    size_t senderIndex, receiverIndex;
 
-      // pickle and unpickle C
-      Persist pickledC = userC->storeAsB64(pickleKeyC);
-      userC.reset(new User(idC));
-      userC->restoreFromB64(pickleKeyC, pickledC);
-    }
+    // randomly pick sender and receiver
+    senderIndex = rand() % users.size();
+    do
+    {
+      receiverIndex = rand() % users.size();
+    } while (senderIndex == receiverIndex);
+    // reset'n'repickle
+    string senderKey = generateRandomString(20);
+    Persist pickledSender = users.at(senderIndex)->storeAsB64(senderKey);
+    string senderId = users.at(senderIndex)->userId;
+    users.at(senderIndex).reset(new User(senderId));
+    users.at(senderIndex)->restoreFromB64(senderKey, pickledSender);
 
-    int rnd = rand() % 6;
-    if (rnd == 0)
-    {
-      messageTest(&(*userA), &(*userB));
-    }
-    else if (rnd == 1)
-    {
-      messageTest(&(*userA), &(*userC));
-    }
-    else if (rnd == 2)
-    {
-      messageTest(&(*userB), &(*userA));
-    }
-    else if (rnd == 3)
-    {
-      messageTest(&(*userB), &(*userC));
-    }
-    else if (rnd == 4)
-    {
-      messageTest(&(*userC), &(*userA));
-    }
-    else
-    {
-      messageTest(&(*userC), &(*userB));
-    }
+    string receiverKey = generateRandomString(20);
+    Persist pickledReceiver = users.at(receiverIndex)->storeAsB64(receiverKey);
+    string receiverId = users.at(receiverIndex)->userId;
+    users.at(receiverIndex).reset(new User(receiverId));
+    users.at(receiverIndex)->restoreFromB64(receiverKey, pickledReceiver);
+
+    messageTest(&(*users.at(senderIndex)), &(*users.at(receiverIndex)));
   }
   cout << "TEST PASSED!" << endl;
 }
@@ -113,7 +85,7 @@ int main()
   cout << "HELLO" << endl;
   srand((unsigned)time(0));
 
-  while (messageIndex < 300)
+  while (messageIndex < 600)
   {
     doTest();
   }
