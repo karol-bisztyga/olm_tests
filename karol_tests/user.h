@@ -11,8 +11,6 @@
 #include "session.h"
 #include "persist.h"
 
-using namespace std;
-
 struct PreKeyBundle
 {
   OlmBuffer identityKeys; // size = 116
@@ -21,7 +19,7 @@ struct PreKeyBundle
 
 struct User
 {
-  const string userId;
+  const std::string userId;
 
   OlmAccount *account = nullptr;
   OlmBuffer accountBuffer;
@@ -30,9 +28,9 @@ struct User
 
   MockRandom mockRandom;
 
-  unordered_map<string, unique_ptr<Session>> sessions = {};
+  std::unordered_map<std::string, std::unique_ptr<Session>> sessions = {};
 
-  User(string userId) : userId(userId), mockRandom(atoi(userId.c_str())) {}
+  User(std::string userId) : userId(userId), mockRandom(atoi(userId.c_str())) {}
 
   void initialize()
   {
@@ -53,22 +51,22 @@ struct User
                   randomAccountBuffer.data(),
                   randomAccountBuffer.size()))
     {
-      throw runtime_error("error createAccount => olm_create_account");
+      throw std::runtime_error("error createAccount => olm_create_account");
     };
   }
 
-  void initializeSession(string targetUserId)
+  void initializeSession(std::string targetUserId)
   {
     if (this->sessions.find(targetUserId) != this->sessions.end())
     {
-      throw runtime_error("error initializeSession => session already initialized");
+      throw std::runtime_error("error initializeSession => session already initialized");
     }
-    unique_ptr<Session> newSession(new Session(
+    std::unique_ptr<Session> newSession(new Session(
       this->userId,
       this->account,
       this->preKeyBundle.identityKeys.data(),
       &this->mockRandom));
-    this->sessions.insert(make_pair(targetUserId, move(newSession)));
+    this->sessions.insert(make_pair(targetUserId, std::move(newSession)));
   }
 
   void getPublicIdentityKeys()
@@ -82,7 +80,7 @@ struct User
                   this->preKeyBundle.identityKeys.data(),
                   this->preKeyBundle.identityKeys.size()))
     {
-      throw runtime_error("error generateIdentityKeys => olm_account_identity_keys");
+      throw std::runtime_error("error generateIdentityKeys => olm_account_identity_keys");
     }
   }
 
@@ -99,7 +97,7 @@ struct User
                   random.data(),
                   random.size()))
     {
-      throw runtime_error("error generateOneTimeKeys => olm_account_generate_one_time_keys");
+      throw std::runtime_error("error generateOneTimeKeys => olm_account_generate_one_time_keys");
     }
   }
 
@@ -112,7 +110,7 @@ struct User
                   this->preKeyBundle.oneTimeKeys.data(),
                   this->preKeyBundle.oneTimeKeys.size()))
     {
-      throw runtime_error("error publishOneTimeKeys => olm_account_one_time_keys");
+      throw std::runtime_error("error publishOneTimeKeys => olm_account_one_time_keys");
     }
     return olm_account_mark_keys_as_published(this->account);
   }
@@ -124,16 +122,16 @@ struct User
     size_t publishedOneTimeKeys = this->publishOneTimeKeys();
     if (publishedOneTimeKeys != oneTimeKeysAmount)
     {
-      throw runtime_error("error generatePreKeyBundle => invalid amount of one-time keys published. Expected " + to_string(oneTimeKeysAmount) + ", got " + to_string(publishedOneTimeKeys));
+      throw std::runtime_error("error generatePreKeyBundle => invalid amount of one-time keys published. Expected " + std::to_string(oneTimeKeysAmount) + ", got " + std::to_string(publishedOneTimeKeys));
     }
   }
 
-  bool hasSessionFor(string targetUserId)
+  bool hasSessionFor(std::string targetUserId)
   {
     return (this->sessions.find(targetUserId) != this->sessions.end());
   }
 
-  Persist storeAsB64(string secretKey)
+  Persist storeAsB64(std::string secretKey)
   {
     Persist persist;
     // mock random
@@ -148,11 +146,11 @@ struct User
                                    accountPickleBuffer.data(),
                                    accountPickleLength))
     {
-      throw runtime_error("error storeAsB64 => olm_pickle_account");
+      throw std::runtime_error("error storeAsB64 => olm_pickle_account");
     }
     persist.account = accountPickleBuffer;
     // sessions
-    unordered_map<string, unique_ptr<Session>>::iterator it;
+    std::unordered_map<std::string, std::unique_ptr<Session>>::iterator it;
     for (it = this->sessions.begin(); it != this->sessions.end(); ++it)
     {
       OlmBuffer buffer = it->second->storeAsB64(secretKey);
@@ -162,7 +160,7 @@ struct User
     return persist;
   }
 
-  void restoreFromB64(string secretKey, Persist persist)
+  void restoreFromB64(std::string secretKey, Persist persist)
   {
     // mock random
     this->mockRandom.current = persist.mockRandomCurrent;
@@ -176,18 +174,18 @@ struct User
                   persist.account.data(),
                   persist.account.size()))
     {
-      throw runtime_error("error restoreFromB64 => olm_unpickle_account");
+      throw std::runtime_error("error restoreFromB64 => olm_unpickle_account");
     }
     if (persist.account.size() != olm_pickle_account_length(this->account))
     {
-      throw runtime_error("error restoreFromB64 => olm_pickle_account_length");
+      throw std::runtime_error("error restoreFromB64 => olm_pickle_account_length");
     }
     this->generatePreKeyBundle();
     // sessions
-    unordered_map<string, OlmBuffer>::iterator it;
+    std::unordered_map<std::string, OlmBuffer>::iterator it;
     for (it = persist.sessions.begin(); it != persist.sessions.end(); ++it)
     {
-      unique_ptr<Session> session(new Session(
+      std::unique_ptr<Session> session(new Session(
           this->userId,
           this->account,
           this->preKeyBundle.identityKeys.data(),
@@ -198,7 +196,7 @@ struct User
   }
 
   // encryptedMessage, messageType
-  tuple<OlmBuffer, size_t> encrypt(string targetUserId, string encrypted)
+  std::tuple<OlmBuffer, size_t> encrypt(std::string targetUserId, std::string encrypted)
   {
     if (this->sessions.find(targetUserId) == this->sessions.end())
     {
@@ -220,25 +218,25 @@ struct User
                   encryptedMessage.data(),
                   encryptedMessage.size()))
     {
-      throw runtime_error("error encrypt => olm_encrypt");
+      throw std::runtime_error("error encrypt => olm_encrypt");
     }
     return {encryptedMessage, messageType};
   }
 
-  string decrypt(string targetUserId, tuple<std::vector<std::uint8_t>, size_t> encryptedData, size_t originalSize)
+  std::string decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t> encryptedData, size_t originalSize)
   {
     if (this->sessions.find(targetUserId) == this->sessions.end())
     {
       this->initializeSession(targetUserId);
     }
     OlmSession *session = this->sessions.at(targetUserId)->session;
-    std::vector<std::uint8_t> encryptedMessage = get<0>(encryptedData);
-    size_t messageType = get<1>(encryptedData);
+    OlmBuffer encryptedMessage = std::get<0>(encryptedData);
+    size_t messageType = std::get<1>(encryptedData);
 
-    std::vector<std::uint8_t> tmpEncryptedMessage(encryptedMessage);
+    OlmBuffer tmpEncryptedMessage(encryptedMessage);
     size_t size = ::olm_decrypt_max_plaintext_length(
         session, messageType, tmpEncryptedMessage.data(), tmpEncryptedMessage.size());
-    std::vector<std::uint8_t> decryptedMessage(size);
+    OlmBuffer decryptedMessage(size);
     size_t res = ::olm_decrypt(
         session,
         messageType,
@@ -248,10 +246,10 @@ struct User
         decryptedMessage.size());
     if (std::size_t(originalSize) != res)
     {
-      throw runtime_error("error olm_decrypt " + string(olm_session_last_error(session)));
+      throw std::runtime_error("error olm_decrypt " + std::string(olm_session_last_error(session)));
     }
     decryptedMessage.resize(originalSize);
-    string result = (char *)decryptedMessage.data();
+    std::string result = (char *)decryptedMessage.data();
     result.resize(originalSize);
     return result;
   }

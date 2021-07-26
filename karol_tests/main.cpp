@@ -12,45 +12,43 @@
 #include "user.h"
 #include "persist.h"
 
-using namespace std;
-
 void messageTest(User *userA, User *userB)
 {
-  cout << "test message: " << userA->userId << " => " << userB->userId << endl;
+  std::cout << "test message: " << userA->userId << " => " << userB->userId << std::endl;
   if (!userA->hasSessionFor(userB->userId))
   {
     userA->initializeSession(userB->userId);
     userA->sessions.at(userB->userId)->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
   }
-  string message = generateRandomMessage();
-  tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(userB->userId, message);
-  cout << "encrypting: " << message << endl;
+  std::string message = generateRandomMessage();
+  std::tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(userB->userId, message);
+  std::cout << "encrypting: " << message << std::endl;
 
   if (!userB->hasSessionFor(userA->userId))
   {
     userB->initializeSession(userA->userId);
-    userB->sessions.at(userA->userId)->createInbound(get<0>(encryptedData), userA->preKeyBundle.identityKeys);
+    userB->sessions.at(userA->userId)->createInbound(std::get<0>(encryptedData), userA->preKeyBundle.identityKeys);
   }
 
-  string decrypted = userB->decrypt(userA->userId, encryptedData, message.size());
-  cout << "decrypted:  " << decrypted << endl;
+  std::string decrypted = userB->decrypt(userA->userId, encryptedData, message.size());
+  std::cout << "decrypted:  " << decrypted << std::endl;
 
   if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
   {
-    throw new runtime_error("decrypted message doesn't match the original one: [" + message + "] != [" + decrypted + "]");
+    throw new std::runtime_error("decrypted message doesn't match the original one: [" + message + "] != [" + decrypted + "]");
   }
 }
 
 void doTest()
 {
-  vector<unique_ptr<User>> users;
+  std::vector<std::unique_ptr<User>> users;
   for (size_t i = 0; i < 10; ++i)
   {
-    unique_ptr<User> user(new User(to_string(1000 + i)));
+    std::unique_ptr<User> user(new User(std::to_string(1000 + i)));
     user->initialize();
     users.push_back(move(user));
   }
-  cout << "initialized" << endl;
+  std::cout << "initialized" << std::endl;
 
   for (size_t i = 0; i < 100; ++i)
   {
@@ -63,26 +61,26 @@ void doTest()
       receiverIndex = rand() % users.size();
     } while (senderIndex == receiverIndex);
     // reset'n'repickle
-    string senderKey = generateRandomString(20);
+    std::string senderKey = generateRandomString(20);
     Persist pickledSender = users.at(senderIndex)->storeAsB64(senderKey);
-    string senderId = users.at(senderIndex)->userId;
+    std::string senderId = users.at(senderIndex)->userId;
     users.at(senderIndex).reset(new User(senderId));
     users.at(senderIndex)->restoreFromB64(senderKey, pickledSender);
 
-    string receiverKey = generateRandomString(20);
+    std::string receiverKey = generateRandomString(20);
     Persist pickledReceiver = users.at(receiverIndex)->storeAsB64(receiverKey);
-    string receiverId = users.at(receiverIndex)->userId;
+    std::string receiverId = users.at(receiverIndex)->userId;
     users.at(receiverIndex).reset(new User(receiverId));
     users.at(receiverIndex)->restoreFromB64(receiverKey, pickledReceiver);
 
     messageTest(&(*users.at(senderIndex)), &(*users.at(receiverIndex)));
   }
-  cout << "TEST PASSED!" << endl;
+  std::cout << "TEST PASSED!" << std::endl;
 }
 
 int main()
 {
-  cout << "HELLO" << endl;
+  std::cout << "HELLO" << std::endl;
   srand((unsigned)time(0));
 
   while (messageIndex < 600)
@@ -90,7 +88,7 @@ int main()
     doTest();
   }
 
-  cout << "GOODBYE" << endl;
+  std::cout << "GOODBYE" << std::endl;
 
   return 0;
 }

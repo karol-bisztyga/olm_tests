@@ -3,8 +3,6 @@
 #include <vector>
 #include <string>
 
-using namespace std;
-
 #define KEYSIZE 43
 
 typedef std::vector<std::uint8_t> OlmBuffer;
@@ -35,7 +33,7 @@ struct MockRandom
   std::uint8_t current;
 };
 
-vector<size_t> availableSigns;
+std::vector<size_t> availableSigns;
 
 void initializeAvailableSigns()
 {
@@ -58,10 +56,10 @@ void initializeAvailableSigns()
   }
 }
 
-string generateRandomString(size_t size)
+std::string generateRandomString(size_t size)
 {
   initializeAvailableSigns();
-  string result;
+  std::string result;
   for (int i = 0; i < size; ++i)
   {
     result.push_back(availableSigns[rand() % (availableSigns.size() - 1)]);
@@ -71,10 +69,10 @@ string generateRandomString(size_t size)
 
 static size_t messageIndex = 0;
 
-string generateRandomMessage(size_t forcedSize = 0)
+std::string generateRandomMessage(size_t forcedSize = 0)
 {
   size_t size = (forcedSize == 0) ? rand() % 30 + 40 : forcedSize;
-  return "[message " + to_string(messageIndex++) + "] " + generateRandomString(size);
+  return "[message " + std::to_string(messageIndex++) + "] " + generateRandomString(size);
 }
 
 unsigned char generateRandomByte()

@@ -6,12 +6,10 @@
 
 #include "tools.h"
 
-using namespace std;
-
 struct Session
 {
   // should be passed from the owner User
-  string userId;
+  std::string userId;
   OlmAccount *ownerUserAccount;
   std::uint8_t *ownerIdentityKeys;
   MockRandom *mockRandom;
@@ -21,7 +19,7 @@ struct Session
   OlmBuffer sessionBuffer;
 
   Session(
-      string userId,
+      std::string userId,
       OlmAccount *account,
       std::uint8_t *ownerIdentityKeys,
       MockRandom *mockRandom) : userId(userId),
@@ -39,7 +37,7 @@ struct Session
   {
     if (this->session != nullptr)
     {
-      throw new runtime_error("error createOutbound => session already initialized");
+      throw new std::runtime_error("error createOutbound => session already initialized");
     }
     this->sessionBuffer.resize(olm_session_size());
     this->session = olm_session(this->sessionBuffer.data());
@@ -57,7 +55,7 @@ struct Session
                   randomBuffer.data(),
                   randomBuffer.size()))
     {
-      throw runtime_error("error createOutbound => olm_create_outbound_session");
+      throw std::runtime_error("error createOutbound => olm_create_outbound_session");
     }
   }
 
@@ -68,7 +66,7 @@ struct Session
   {
     if (this->session != nullptr)
     {
-      throw new runtime_error("error createInbound => session already initialized");
+      throw new std::runtime_error("error createInbound => session already initialized");
     }
     OlmBuffer tmpEncryptedMessage(encryptedMessage);
     this->sessionBuffer.resize(olm_session_size());
@@ -79,7 +77,7 @@ struct Session
                   tmpEncryptedMessage.data(),
                   encryptedMessage.size()))
     {
-      throw runtime_error("error createInbound => olm_create_inbound_session");
+      throw std::runtime_error("error createInbound => olm_create_inbound_session");
     }
     // Check that the inbound session matches the message it was created from.
     memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
@@ -88,7 +86,7 @@ struct Session
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
     {
-      throw runtime_error("error createInbound => olm_matches_inbound_session");
+      throw std::runtime_error("error createInbound => olm_matches_inbound_session");
     }
 
     // Check that the inbound session matches the key this message is supposed
@@ -101,7 +99,7 @@ struct Session
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
     {
-      throw runtime_error("error createInbound => olm_matches_inbound_session_from");
+      throw std::runtime_error("error createInbound => olm_matches_inbound_session_from");
     }
 
     // Check that the inbound session isn't from a different user.
@@ -113,11 +111,11 @@ struct Session
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
     {
-      throw runtime_error("error createInbound => olm_matches_inbound_session_from");
+      throw std::runtime_error("error createInbound => olm_matches_inbound_session_from");
     }
   }
 
-  OlmBuffer storeAsB64(string secretKey)
+  OlmBuffer storeAsB64(std::string secretKey)
   {
     // min = 224, max = 4384
     size_t pickleLength = olm_pickle_session_length(this->session);
@@ -130,12 +128,12 @@ struct Session
         pickleLength);
     if (pickleLength != res)
     {
-      throw runtime_error("error pickleSession => olm_pickle_session");
+      throw std::runtime_error("error pickleSession => olm_pickle_session");
     }
     return pickle;
   }
 
-  void restoreFromB64(string secretKey, OlmBuffer b64)
+  void restoreFromB64(std::string secretKey, OlmBuffer b64)
   {
     this->sessionBuffer.resize(olm_session_size());
     this->session = olm_session(this->sessionBuffer.data());
@@ -146,11 +144,11 @@ struct Session
                   b64.data(),
                   b64.size()))
     {
-      throw runtime_error("error pickleSession => olm_unpickle_session");
+      throw std::runtime_error("error pickleSession => olm_unpickle_session");
     }
     if (b64.size() != olm_pickle_session_length(this->session))
     {
-      throw runtime_error("error pickleSession => olm_pickle_session_length");
+      throw std::runtime_error("error pickleSession => olm_pickle_session_length");
     }
   }
 };

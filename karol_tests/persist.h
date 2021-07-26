@@ -5,13 +5,11 @@
 
 #include "tools.h"
 
-using namespace std;
-
 struct Persist
 {
   uint8_t mockRandomCurrent;
   // min 438, max 9504
   OlmBuffer account;
   // min = 224, max = 4384
-  unordered_map<string, OlmBuffer> sessions;
+  std::unordered_map<std::string, OlmBuffer> sessions;
 };
