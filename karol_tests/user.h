@@ -26,11 +26,9 @@ struct User
 
   PreKeyBundle preKeyBundle;
 
-  MockRandom mockRandom;
-
   std::unordered_map<std::string, std::unique_ptr<Session>> sessions = {};
 
-  User(std::string userId) : userId(userId), mockRandom(atoi(userId.c_str())) {}
+  User(std::string userId) : userId(userId) {}
 
   void initialize()
   {
@@ -43,13 +41,16 @@ struct User
     this->accountBuffer.resize(::olm_account_size());
     this->account = ::olm_account(this->accountBuffer.data());
     OlmBuffer randomAccountBuffer;
-    randomAccountBuffer.resize(::olm_create_account_random_length(this->account));
-    this->mockRandom(randomAccountBuffer.data(), randomAccountBuffer.size());
+    generateRandomBytes(randomAccountBuffer, ::olm_create_account_random_length(this->account));
+
+    size_t randomSize = ::olm_create_account_random_length(this->account);
+    OlmBuffer randomBuffer;
+    generateRandomBytes(randomBuffer, randomSize);
 
     if (-1 == ::olm_create_account(
                   this->account,
-                  randomAccountBuffer.data(),
-                  randomAccountBuffer.size()))
+                  randomBuffer.data(),
+                  randomSize))
     {
       throw std::runtime_error("error createAccount => ::olm_create_account");
     };
@@ -64,8 +65,7 @@ struct User
     std::unique_ptr<Session> newSession(new Session(
       this->userId,
       this->account,
-      this->preKeyBundle.identityKeys.data(),
-      &this->mockRandom));
+      this->preKeyBundle.identityKeys.data()));
     this->sessions.insert(make_pair(targetUserId, std::move(newSession)));
   }
 
@@ -88,8 +88,7 @@ struct User
   void generateOneTimeKeys(size_t oneTimeKeysAmount)
   {
     OlmBuffer random;
-    random.resize(::olm_account_generate_one_time_keys_random_length(this->account, oneTimeKeysAmount));
-    mockRandom(random.data(), random.size());
+    generateRandomBytes(random, ::olm_account_generate_one_time_keys_random_length(this->account, oneTimeKeysAmount));
 
     if (-1 == ::olm_account_generate_one_time_keys(
                   this->account,
@@ -134,8 +133,6 @@ struct User
   Persist storeAsB64(std::string secretKey)
   {
     Persist persist;
-    // mock random
-    persist.mockRandomCurrent = this->mockRandom.current;
     // account
     size_t accountPickleLength = ::olm_pickle_account_length(this->account); // min 438, max 9504
     OlmBuffer accountPickleBuffer(accountPickleLength);
@@ -162,8 +159,6 @@ struct User
 
   void restoreFromB64(std::string secretKey, Persist persist)
   {
-    // mock random
-    this->mockRandom.current = persist.mockRandomCurrent;
     // account
     this->accountBuffer.resize(::olm_account_size());
     this->account = ::olm_account(this->accountBuffer.data());
@@ -188,8 +183,7 @@ struct User
       std::unique_ptr<Session> session(new Session(
           this->userId,
           this->account,
-          this->preKeyBundle.identityKeys.data(),
-          &this->mockRandom));
+          this->preKeyBundle.identityKeys.data()));
       session->restoreFromB64(secretKey, it->second);
       this->sessions.insert(make_pair(it->first, move(session)));
     }
@@ -206,8 +200,7 @@ struct User
     OlmBuffer encryptedMessage(
         ::olm_encrypt_message_length(session, encrypted.size()));
     OlmBuffer messageRandom;
-    messageRandom.resize(::olm_encrypt_random_length(session));
-    mockRandom(messageRandom.data(), messageRandom.size());
+    generateRandomBytes(messageRandom, ::olm_encrypt_random_length(session));
     size_t messageType = ::olm_encrypt_message_type(session);
     if (-1 == ::olm_encrypt(
                   session,

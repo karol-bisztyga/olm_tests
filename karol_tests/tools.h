@@ -7,32 +7,6 @@
 
 typedef std::vector<std::uint8_t> OlmBuffer;
 
-struct MockRandom
-{
-  MockRandom(std::uint8_t offset = 0)
-      : tag(0x01), current(offset) {}
-  void operator()(
-      std::uint8_t *bytes, std::size_t length)
-  {
-    while (length > 32)
-    {
-      bytes[0] = tag;
-      std::memset(bytes + 1, current, 31);
-      length -= 32;
-      bytes += 32;
-      current += 1;
-    }
-    if (length)
-    {
-      bytes[0] = tag;
-      std::memset(bytes + 1, current, length - 1);
-      current += 1;
-    }
-  }
-  std::uint8_t tag;
-  std::uint8_t current;
-};
-
 std::vector<size_t> availableSigns;
 
 void initializeAvailableSigns()
@@ -80,3 +54,12 @@ unsigned char generateRandomByte()
   return (unsigned char)rand() % 256;
 }
 
+void generateRandomBytes(OlmBuffer &buffer, size_t size)
+{
+  buffer.resize(size);
+
+  for (size_t i = 0; i < size; ++i)
+  {
+    buffer[i] = generateRandomByte();
+  }
+}

@@ -12,7 +12,6 @@ struct Session
   std::string userId;
   OlmAccount *ownerUserAccount;
   std::uint8_t *ownerIdentityKeys;
-  MockRandom *mockRandom;
 
   //
   OlmSession *session = nullptr;
@@ -21,11 +20,9 @@ struct Session
   Session(
       std::string userId,
       OlmAccount *account,
-      std::uint8_t *ownerIdentityKeys,
-      MockRandom *mockRandom) : userId(userId),
+      std::uint8_t *ownerIdentityKeys) : userId(userId),
                                 ownerUserAccount(account),
-                                ownerIdentityKeys(ownerIdentityKeys),
-                                mockRandom(mockRandom) {}
+                                ownerIdentityKeys(ownerIdentityKeys) {}
 
   /**
    * this should be used when we are sending a message
@@ -41,9 +38,9 @@ struct Session
     }
     this->sessionBuffer.resize(::olm_session_size());
     this->session = ::olm_session(this->sessionBuffer.data());
-    OlmBuffer randomBuffer(::olm_create_outbound_session_random_length(this->session));
 
-    (*this->mockRandom)(randomBuffer.data(), randomBuffer.size());
+    OlmBuffer randomBuffer;
+    generateRandomBytes(randomBuffer, ::olm_create_outbound_session_random_length(this->session));
 
     if (-1 == ::olm_create_outbound_session(
                   this->session,
@@ -99,7 +96,7 @@ struct Session
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
     {
-      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from");
+      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from #1");
     }
 
     // Check that the inbound session isn't from a different user.
@@ -111,7 +108,7 @@ struct Session
                  tmpEncryptedMessage.data(),
                  encryptedMessage.size()))
     {
-      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from");
+      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from #2");
     }
   }
 
