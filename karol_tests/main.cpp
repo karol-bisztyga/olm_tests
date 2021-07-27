@@ -50,7 +50,15 @@ void doTest()
   }
   std::cout << "initialized" << std::endl;
 
-  for (size_t i = 0; i < 100; ++i)
+  auto resetAndRepickle = [&users](size_t userIndex) {
+    std::string pickleKey = generateRandomString(20);
+    Persist pickledReceiver = users.at(userIndex)->storeAsB64(pickleKey);
+    std::string receiverId = users.at(userIndex)->userId;
+    users.at(userIndex).reset(new User(receiverId));
+    users.at(userIndex)->restoreFromB64(pickleKey, pickledReceiver);
+  };
+
+  for (size_t i = 0; i < 250; ++i)
   {
     size_t senderIndex, receiverIndex;
 
@@ -61,17 +69,23 @@ void doTest()
       receiverIndex = rand() % users.size();
     } while (senderIndex == receiverIndex);
     // reset'n'repickle
-    std::string senderKey = generateRandomString(20);
-    Persist pickledSender = users.at(senderIndex)->storeAsB64(senderKey);
-    std::string senderId = users.at(senderIndex)->userId;
-    users.at(senderIndex).reset(new User(senderId));
-    users.at(senderIndex)->restoreFromB64(senderKey, pickledSender);
-
-    std::string receiverKey = generateRandomString(20);
-    Persist pickledReceiver = users.at(receiverIndex)->storeAsB64(receiverKey);
-    std::string receiverId = users.at(receiverIndex)->userId;
-    users.at(receiverIndex).reset(new User(receiverId));
-    users.at(receiverIndex)->restoreFromB64(receiverKey, pickledReceiver);
+    // 0 - reset sender
+    // 1 - reset receiver
+    // 2 - reset both
+    size_t repickleOption = rand() % 3;
+    if (repickleOption == 0)
+    {
+      resetAndRepickle(senderIndex);
+    }
+    else if (repickleOption == 1)
+    {
+      resetAndRepickle(receiverIndex);
+    }
+    else
+    {
+      resetAndRepickle(senderIndex);
+      resetAndRepickle(receiverIndex);
+    }
 
     messageTest(&(*users.at(senderIndex)), &(*users.at(receiverIndex)));
   }
@@ -85,7 +99,7 @@ int main()
 
   try
   {
-    while (messageIndex < 600)
+    while (messageIndex < 2000)
     {
       doTest();
     }

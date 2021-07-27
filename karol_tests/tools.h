@@ -45,7 +45,7 @@ static size_t messageIndex = 0;
 
 std::string generateRandomMessage(size_t forcedSize = 0)
 {
-  size_t size = (forcedSize == 0) ? rand() % 30 + 40 : forcedSize;
+  size_t size = (forcedSize == 0) ? rand() % 200 + 20 : forcedSize;
   return "[message " + std::to_string(messageIndex++) + "] " + generateRandomString(size);
 }
 
