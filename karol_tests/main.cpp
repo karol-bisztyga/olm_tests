@@ -14,23 +14,23 @@
 
 void messageTest(User *userA, User *userB)
 {
-  std::cout << "test message: " << userA->userId << " => " << userB->userId << std::endl;
-  if (!userA->hasSessionFor(userB->userId))
+  std::cout << "test message: " << userA->id << " => " << userB->id << std::endl;
+  if (!userA->hasSessionFor(userB->id))
   {
-    userA->initializeSession(userB->userId);
-    userA->sessions.at(userB->userId)->createOutbound(userB->preKeyBundle.identityKeys, userB->preKeyBundle.oneTimeKeys, 0);
+    userA->initializeSession(userB->id);
+    userA->getSessionByUserId(userB->id)->createOutbound(userB->keys.identityKeys, userB->keys.oneTimeKeys, 0);
   }
-  std::string message = generateRandomMessage();
-  std::tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(userB->userId, message);
+  std::string message = Tools::getInstance().generateRandomMessage();
+  std::tuple<OlmBuffer, size_t> encryptedData = userA->encrypt(userB->id, message);
   std::cout << "encrypting: " << message << std::endl;
 
-  if (!userB->hasSessionFor(userA->userId))
+  if (!userB->hasSessionFor(userA->id))
   {
-    userB->initializeSession(userA->userId);
-    userB->sessions.at(userA->userId)->createInbound(std::get<0>(encryptedData), userA->preKeyBundle.identityKeys);
+    userB->initializeSession(userA->id);
+    userB->getSessionByUserId(userA->id)->createInbound(std::get<0>(encryptedData), userA->keys.identityKeys);
   }
 
-  std::string decrypted = userB->decrypt(userA->userId, encryptedData, message.size());
+  std::string decrypted = userB->decrypt(userA->id, encryptedData, message.size());
   std::cout << "decrypted:  " << decrypted << std::endl;
 
   if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
@@ -51,9 +51,9 @@ void doTest()
   std::cout << "initialized" << std::endl;
 
   auto resetAndRepickle = [&users](size_t userIndex) {
-    std::string pickleKey = generateRandomString(20);
+    std::string pickleKey = Tools::getInstance().generateRandomString(20);
     Persist pickledReceiver = users.at(userIndex)->storeAsB64(pickleKey);
-    std::string receiverId = users.at(userIndex)->userId;
+    std::string receiverId = users.at(userIndex)->id;
     users.at(userIndex).reset(new User(receiverId));
     users.at(userIndex)->restoreFromB64(pickleKey, pickledReceiver);
   };
@@ -99,7 +99,7 @@ int main()
 
   try
   {
-    while (messageIndex < 2000)
+    while (Tools::getInstance().messageIndex < 2000)
     {
       doTest();
     }
