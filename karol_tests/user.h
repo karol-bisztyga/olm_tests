@@ -38,6 +38,6 @@ public:
   void restoreFromB64(std::string secretKey, Persist persist);
   // encryptedMessage, messageType
   std::tuple<OlmBuffer, size_t> encrypt(std::string targetUserId, std::string encrypted);
-  std::string decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t> encryptedData, size_t originalSize);
+  std::string decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t> encryptedData, size_t originalSize, OlmBuffer &theirIdKeys);
   std::shared_ptr<Session> getSessionByUserId(std::string userId);
 };

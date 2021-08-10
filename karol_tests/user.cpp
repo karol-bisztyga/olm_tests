@@ -42,7 +42,7 @@ void User::initializeSession(std::string targetUserId)
 void User::getPublicIdentityKeys()
 {
   // this in fact doesn't really generate identity keys, it just puts them
-  // in the pre key bundle struct object
+  // in the keys struct object
   // those keys are generated when the account is created
   this->keys.identityKeys.resize(::olm_account_identity_keys_length(this->account));
   if (-1 == ::olm_account_identity_keys(
@@ -186,7 +186,7 @@ std::tuple<OlmBuffer, size_t> User::encrypt(std::string targetUserId, std::strin
   return {encryptedMessage, messageType};
 }
 
-std::string User::decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t> encryptedData, size_t originalSize)
+std::string User::decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t> encryptedData, size_t originalSize, OlmBuffer &theirIdKeys)
 {
   if (this->sessions.find(targetUserId) == this->sessions.end())
   {
@@ -195,8 +195,39 @@ std::string User::decrypt(std::string targetUserId, std::tuple<OlmBuffer, size_t
   OlmSession *session = this->sessions.at(targetUserId)->getSession();
   OlmBuffer encryptedMessage = std::get<0>(encryptedData);
   size_t messageType = std::get<1>(encryptedData);
+  OlmBuffer tmpEncryptedMessage;
 
-  OlmBuffer tmpEncryptedMessage(encryptedMessage);
+  if (messageType == 0)
+  {
+    // Check that the inbound session matches the message it was created from.
+    tmpEncryptedMessage = OlmBuffer(encryptedMessage);
+    size_t st = ::olm_matches_inbound_session(
+        session,
+        tmpEncryptedMessage.data(),
+        encryptedMessage.size());
+    if (1 != st)
+    {
+      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session");
+    }
+
+    // Check that the inbound session matches the key this message is supposed
+    // to be from.
+    tmpEncryptedMessage = OlmBuffer(encryptedMessage);
+    OlmBuffer keybuff;
+    keybuff = OlmBuffer(KEYSIZE);
+    memcpy(keybuff.data(), theirIdKeys.data() + 15, KEYSIZE);
+    if (1 != ::olm_matches_inbound_session_from(
+                 session,
+                 theirIdKeys.data() + 15, // A's curve125519 identity key
+                 KEYSIZE,
+                 tmpEncryptedMessage.data(),
+                 encryptedMessage.size()))
+    {
+      throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from #1");
+    }
+  }
+
+  tmpEncryptedMessage = OlmBuffer(encryptedMessage);
   size_t size = ::olm_decrypt_max_plaintext_length(
       session, messageType, tmpEncryptedMessage.data(), tmpEncryptedMessage.size());
   OlmBuffer decryptedMessage(size);

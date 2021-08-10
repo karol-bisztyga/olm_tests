@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <random>
 #include <string>
 
 #define KEYSIZE 43
@@ -15,8 +16,11 @@ struct Keys
 
 class Tools
 {
-  Tools() {}
   std::vector<size_t> availableSigns;
+  std::random_device rd;
+  std::mt19937 mt;
+
+  Tools() : mt(rd()) {}
 
 public:
   static size_t messageIndex;

@@ -46,40 +46,6 @@ void Session::createInbound(OlmBuffer encryptedMessage, OlmBuffer idKeys)
   {
     throw std::runtime_error("error createInbound => ::olm_create_inbound_session");
   }
-  // Check that the inbound session matches the message it was created from.
-  memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-  if (1 != ::olm_matches_inbound_session(
-               this->session,
-               tmpEncryptedMessage.data(),
-               encryptedMessage.size()))
-  {
-    throw std::runtime_error("error createInbound => ::olm_matches_inbound_session");
-  }
-
-  // Check that the inbound session matches the key this message is supposed
-  // to be from.
-  memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-  if (1 != ::olm_matches_inbound_session_from(
-               this->session,
-               idKeys.data() + 15, // A's curve125519 identity key
-               KEYSIZE,
-               tmpEncryptedMessage.data(),
-               encryptedMessage.size()))
-  {
-    throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from #1");
-  }
-
-  // Check that the inbound session isn't from a different user.
-  memcpy(tmpEncryptedMessage.data(), encryptedMessage.data(), encryptedMessage.size());
-  if (0 != ::olm_matches_inbound_session_from(
-               this->session,
-               ownerIdentityKeys + 15, // B's curve25519 identity key.
-               KEYSIZE,
-               tmpEncryptedMessage.data(),
-               encryptedMessage.size()))
-  {
-    throw std::runtime_error("error createInbound => ::olm_matches_inbound_session_from #2");
-  }
 }
 
 OlmBuffer Session::storeAsB64(std::string secretKey)

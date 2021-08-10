@@ -26,10 +26,12 @@ void Tools::initializeAvailableSigns()
 std::string Tools::generateRandomString(size_t size)
 {
   initializeAvailableSigns();
+  static std::uniform_int_distribution<int> randomStringUid(
+      0, availableSigns.size() - 1);
   std::string result;
   for (int i = 0; i < size; ++i)
   {
-    result.push_back(availableSigns[rand() % (availableSigns.size() - 1)]);
+    result.push_back(availableSigns[randomStringUid(this->mt)]);
   }
   return result;
 }
@@ -42,7 +44,8 @@ std::string Tools::generateRandomMessage(size_t forcedSize)
 
 unsigned char Tools::generateRandomByte()
 {
-  return (unsigned char)rand() % 256;
+  static std::uniform_int_distribution<int> randomByteUid(0, 255);
+  return (unsigned char)randomByteUid(this->mt);
 }
 
 void Tools::generateRandomBytes(OlmBuffer &buffer, size_t size)

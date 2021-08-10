@@ -30,7 +30,7 @@ void messageTest(User *userA, User *userB)
     userB->getSessionByUserId(userA->id)->createInbound(std::get<0>(encryptedData), userA->keys.identityKeys);
   }
 
-  std::string decrypted = userB->decrypt(userA->id, encryptedData, message.size());
+  std::string decrypted = userB->decrypt(userA->id, encryptedData, message.size(), userA->keys.identityKeys);
   std::cout << "decrypted:  " << decrypted << std::endl;
 
   if (memcmp(message.data(), decrypted.data(), message.size()) != 0)
@@ -95,7 +95,6 @@ void doTest()
 int main()
 {
   std::cout << "HELLO" << std::endl;
-  srand((unsigned)time(0));
 
   try
   {
