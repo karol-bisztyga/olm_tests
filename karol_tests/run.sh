@@ -1,5 +1,8 @@
 #!/bin/bash
 
+rm -rf build
+mkdir build
+
 g++ -std=c++11 -I../include -I../lib -o build/out.out tools.cpp user.cpp session.cpp main.cpp  \
 ../build/release/src/*.o \
 ../build/release/lib/crypto-algorithms/*.o \
